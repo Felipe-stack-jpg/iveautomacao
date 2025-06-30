@@ -60,6 +60,9 @@ def gerar_pdf_relatorio(df):
     return buffer
 
 
+def clean_number(col):
+    # Remove tudo que não for dígito (0-9)
+    return col.fillna('').astype(str).str.replace(r'\D+', '', regex=True)
 
 st.title("Relatório Distribuidora de Autopeças")
 
@@ -69,39 +72,12 @@ if uploaded_file:
     df = pd.read_excel(uploaded_file)
     df['Data Abertura'] = pd.to_datetime(df['Data Abertura'], dayfirst=True)
 
-    # Limpeza para criar chave sem data
-    df['chave_sem_data'] = (
-        clean_text(df['Nome']) + '_' +
-        clean_text(df['Contato']) + '_' +
-        clean_text(df['Canal']) + '_' +
-        clean_text(df['Agente'])
-    )
+    # Limpar nome e contato
+    df['Nome_Limpo'] = clean_text(df['Nome'])
+    df['Contato_Limpo'] = clean_number(df['Contato'])
 
-    # Ordenar por chave e data
-    df = df.sort_values(by=['chave_sem_data', 'Data Abertura']).reset_index(drop=True)
-
-    indices_para_manter = []
-    grupo_atual = None
-    ultimo_tempo = None
-
-    for idx, row in df.iterrows():
-        chave = row['chave_sem_data']
-        tempo = row['Data Abertura']
-
-        if grupo_atual != chave:
-            # Novo grupo
-            indices_para_manter.append(idx)
-            grupo_atual = chave
-            ultimo_tempo = tempo
-        else:
-            # Mesmo grupo: verifica diferença de tempo com ultimo mantido
-            diff = (tempo - ultimo_tempo).total_seconds() / 60  # em minutos
-            if diff >= 10:
-                indices_para_manter.append(idx)
-                ultimo_tempo = tempo
-            # Se diff < 10, ignora (considera duplicado)
-
-    df_limpo = df.loc[indices_para_manter]
+    # Remove duplicatas considerando nome e contato limpos
+    df_limpo = df.drop_duplicates(subset=['Nome_Limpo', 'Contato_Limpo']).reset_index(drop=True)
 
     # Checkbox para filtrar por data
     filtrar_data = st.checkbox("Filtrar por data específica?")
